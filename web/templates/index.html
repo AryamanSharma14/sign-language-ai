@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Language Recognition</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Sign Language Recognition Dashboard</h1>
+  </header>
+
+  <main>
+    <!-- Left: Live feed -->
+    <section class="panel feed-panel">
+      <h2>Live Feed</h2>
+      <img id="video" src="/video_feed" alt="Live camera feed" />
+    </section>
+
+    <!-- Right: Stats -->
+    <section class="panel stats-panel">
+
+      <!-- Gesture + command -->
+      <div class="gesture-display">
+        <div id="gesture-label">--</div>
+        <div id="gesture-command" class="command">--</div>
+      </div>
+
+      <!-- Confidence gauge -->
+      <div class="confidence-block">
+        <label>Confidence</label>
+        <div class="gauge-track">
+          <div id="gauge-fill" class="gauge-fill" style="width:0%"></div>
+        </div>
+        <span id="confidence-value">0.00</span>
+      </div>
+
+      <!-- FPS / Inference chart -->
+      <div class="chart-block">
+        <canvas id="metrics-chart"></canvas>
+      </div>
+
+      <!-- Gesture history -->
+      <div class="history-block">
+        <h3>History</h3>
+        <table>
+          <thead><tr><th>Time</th><th>Gesture</th><th>Command</th><th>Conf</th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+
+    </section>
+  </main>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

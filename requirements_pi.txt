@@ -1,0 +1,7 @@
+opencv-python-headless
+mediapipe
+scikit-learn
+numpy
+joblib
+RPi.GPIO; platform_machine == "aarch64"
+pyserial
