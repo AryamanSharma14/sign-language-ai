@@ -1,13 +1,84 @@
-venv/
+# --- Python ---
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 *.pyd
+*.pyo
 .Python
 *.egg-info/
 dist/
 build/
+eggs/
+parts/
+var/
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.installed.cfg
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+.env/
+
+# --- Environment / secrets ---
 .env
+.env.*
+*.pem
+*.key
+
+# --- Datasets (large / generated) ---
 dataset/
+*.csv
+
+# --- Model artifacts (large binaries) ---
 models/*.pkl
+*.pkl
+*.h5
+*.onnx
+*.tflite
+*.pt
+*.pth
+
+# --- MediaPipe task files (large) ---
 *.task
+
+# --- Jupyter / IPython ---
+.ipynb_checkpoints
+*.ipynb
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.tox/
+.nox/
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Claude / AI tooling ---
+.claude/
+.agents/
+skills-lock.json
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# --- Logs ---
+*.log
+logs/

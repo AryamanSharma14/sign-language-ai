@@ -1,94 +1,82 @@
-# Real-Time Sign Language Gesture Recognition
+# Sign Language AI — Real-Time Gesture Recognition
 
-A Python MVP that detects hand gestures via webcam using MediaPipe hand landmarks,
-classifies them with a scikit-learn SVC, and displays predictions in real time.
+A modular Python system for real-time ASL gesture recognition using MediaPipe hand landmarks and a scikit-learn SVC classifier. Runs on Windows/Linux PCs, Raspberry Pi, and any embedded Linux target. Ships with a live web dashboard, edge inference engine, GPIO output, and a full training pipeline.
+
+---
+
+## Table of Contents
+
+1. [Features](#features)
+2. [Supported Gestures](#supported-gestures)
+3. [Architecture](#architecture)
+4. [Project Structure](#project-structure)
+5. [Requirements](#requirements)
+6. [Quick Start (PC)](#quick-start-pc)
+7. [Training Pipeline](#training-pipeline)
+8. [Running Recognition](#running-recognition)
+9. [Web Dashboard](#web-dashboard)
+10. [Edge Inference (Raspberry Pi)](#edge-inference-raspberry-pi)
+11. [Hardware / GPIO](#hardware--gpio)
+12. [Configuration](#configuration)
+13. [Tests](#tests)
+14. [Platform Notes](#platform-notes)
+
+---
+
+## Features
+
+| Feature | Detail |
+|---------|--------|
+| Hand landmark extraction | MediaPipe Hand Landmarker (21 landmarks × 3D + palm normal = 66-dim vector) |
+| Classifier | SVC (RBF kernel) with 5-fold GridSearchCV tuning |
+| Confidence smoothing | EWMA per-gesture smoothing to suppress flicker |
+| Web dashboard | Flask MJPEG stream + WebSocket live events + Chart.js metrics |
+| Edge inference | Frame-skip, FPS cap, gesture→command mapping, performance metrics |
+| GPIO output | BCM pin per gesture on Raspberry Pi; terminal simulation on PC |
+| Arduino serial | `GESTURE:LABEL:CONFIDENCE\n` protocol over `/dev/ttyUSB0` |
+| Headless mode | Runs without a display on embedded Linux targets |
+| Modular config | All tuneable values centralised in `config.py` |
+| Tests | pytest suite covering core utilities, predictor, and gesture list |
 
 ---
 
 ## Supported Gestures
 
-| Label | Description |
-|-------|-------------|
-| A | Closed fist / ASL A |
-| B | Flat hand, fingers together / ASL B |
-| C | Curved hand / ASL C |
-| PEACE | Two-finger V shape |
-| OK | Thumb and index finger circle |
+| Label | ASL Description |
+|-------|----------------|
+| `A` | Closed fist |
+| `B` | Flat open hand, fingers together |
+| `C` | Curved / cupped hand |
+| `PEACE` | Two-finger V shape |
+| `OK` | Thumb-and-index-finger circle |
+
+Adding a new gesture requires only collecting samples and retraining — no code changes.
 
 ---
 
-## Setup
+## Architecture
 
-```bash
-cd sign-language-ai
-pip install -r requirements.txt
 ```
-
-> **Python 3.10+** required (uses `X | Y` union type hints).
-
----
-
-## Usage (3 Steps)
-
-### Step 1 — Collect Data
-
-```bash
-python collect_data.py
+Webcam / Pi Camera
+       │
+       ▼
+ MediaPipe Hand Landmarker
+  (21 landmarks × 3D coords + palm normal → 66-dim feature vector)
+       │
+       ▼
+  EWMAPredictor  ◄── models/model.pkl  (SVC trained with GridSearchCV)
+  (EWMA smoothing + confidence threshold gating)
+       │
+    ┌──┴──────────────────────────┐
+    ▼                             ▼
+ Inference Scripts           Web Dashboard
+ run_recognition.py          Flask MJPEG feed
+ edge_inference.py           WebSocket events
+    │                        Chart.js metrics
+    ▼
+ Hardware Output
+ GPIO pins / Serial / Terminal simulation
 ```
-
-- Enter a gesture label (e.g. `A`) when prompted
-- Hold your hand in front of the webcam
-- Press **`s`** to save a sample, **`q`** to quit
-- Collect ~100 samples per gesture (5 gestures = ~500 total rows)
-- Repeat for each gesture label
-
-Samples are appended to `dataset/gestures.csv`.
-
-### Step 2 — Train Model
-
-```bash
-python train_model.py
-```
-
-- Loads `dataset/gestures.csv`
-- Trains KNN (k=5) and SVC (rbf, C=10) classifiers
-- Prints accuracy, classification report, and confusion matrix for both
-- Saves the SVC model to `model.pkl`
-
-Expected results with 100 samples/gesture: KNN >90%, SVC >95%.
-
-### Step 3 — Run Recognition
-
-```bash
-python run_recognition.py
-```
-
-- Loads `model.pkl`
-- Opens webcam with live hand tracking
-- Displays predicted gesture and confidence score
-- Green label = high confidence (≥ 0.60), Yellow = lower confidence
-- Press **`q`** to quit, **`r`** to reset the prediction buffer
-
----
-
-## Tips for Better Accuracy
-
-- **Lighting**: Use consistent, good lighting — avoid backlight
-- **Background**: Plain backgrounds help hand detection
-- **Distance**: Keep hand 30–60 cm from camera
-- **Variety**: Collect samples at different angles and hand positions
-- **Balance**: Collect the same number of samples per gesture
-- **PEACE vs B confusion**: These are visually similar — collect more samples
-  with slight angle variations to improve separation
-
----
-
-## Windows-Specific Notes
-
-- The scripts use `cv2.VideoCapture(0, cv2.CAP_DSHOW)` for faster webcam startup on Windows.
-  If your webcam doesn't open, try changing the index to `1` or `2`.
-- If you have multiple cameras, try indices 0, 1, 2 to find your webcam.
-- MediaPipe may show warnings on first run — these are harmless.
 
 ---
 
@@ -96,211 +84,378 @@ python run_recognition.py
 
 ```
 sign-language-ai/
-├── dataset/
-│   └── gestures.csv      # label + 63 landmark features per row
-├── utils.py              # shared: landmark extraction + normalization
-├── collect_data.py       # Step 1: webcam → CSV
-├── train_model.py        # Step 2: CSV → model.pkl
-├── run_recognition.py    # Step 3: webcam → live prediction
-├── platform_io.py        # Hardware abstraction layer (GPIO / Serial)
-├── model.pkl             # saved SVC model (created by train_model.py)
-├── requirements.txt      # PC dependencies
-└── requirements_pi.txt   # Raspberry Pi / embedded dependencies
+│
+├── config.py                  # Single source of truth for all settings
+├── requirements.txt           # PC dependencies
+├── requirements_pi.txt        # Raspberry Pi / embedded dependencies
+├── install_pi.sh              # Automated Pi dependency installer
+│
+├── core/                      # Shared ML core (importable library)
+│   ├── gestures.py            # Canonical gesture label list
+│   ├── predictor.py           # EWMAPredictor — inference wrapper + smoothing
+│   └── utils.py               # Feature extraction from MediaPipe landmarks
+│
+├── training/                  # Offline training pipeline
+│   ├── collect_data.py        # Webcam → gestures.csv data collector
+│   └── train_model.py         # GridSearchCV SVC trainer → models/model.pkl
+│
+├── inference/                 # Runtime inference scripts
+│   ├── run_recognition.py     # PC live recognition (windowed + headless)
+│   └── edge_inference.py      # Embedded-target inference with metrics + frame-skip
+│
+├── hardware/                  # Hardware abstraction layer
+│   ├── gpio_controller.py     # Standalone RPi.GPIO controller (PC: simulated)
+│   └── platform_io.py        # Platform detection + unified IO routing
+│
+├── web/                       # Live web dashboard
+│   ├── app.py                 # Flask app — MJPEG route + WebSocket route
+│   ├── stream.py              # Background camera thread + event queue
+│   ├── templates/
+│   │   └── index.html         # Dashboard HTML (Chart.js + confidence gauge)
+│   └── static/                # CSS / JS assets
+│
+├── tests/                     # pytest test suite
+│   ├── test_gestures.py
+│   ├── test_predictor.py
+│   └── test_utils.py
+│
+├── models/                    # Model artifacts (git-ignored)
+│   └── model.pkl              # Trained SVC (generated by train_model.py)
+│
+├── dataset/                   # Training data (git-ignored)
+│   └── gestures.csv           # label + 66 features per row
+│
+└── hand_landmarker.task       # MediaPipe model file (git-ignored, ~8 MB)
 ```
 
 ---
 
-## Embedded Systems Demo
+## Requirements
 
-This project includes a hardware abstraction layer (`platform_io.py`) that makes the
-recognizer behave like an embedded system — printing boot messages, routing gesture
-events to GPIO pins or a serial port, and capping framerate for resource-constrained hardware.
+### PC (Windows / Linux / macOS)
+
+```
+Python 3.10+
+opencv-python
+mediapipe
+scikit-learn
+numpy
+joblib
+flask
+flask-sock
+```
+
+### Raspberry Pi / Embedded Linux
+
+```
+opencv-python-headless
+mediapipe
+scikit-learn
+numpy
+joblib
+pyserial
+RPi.GPIO          # aarch64 only — installed automatically on Pi hardware
+```
+
+---
+
+## Quick Start (PC)
+
+```bash
+# 1. Clone
+git clone https://github.com/AryamanSharma14/sign-language-ai.git
+cd sign-language-ai
+
+# 2. Create virtual environment
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux / macOS
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Download the MediaPipe hand model and place it in the project root:
+#    hand_landmarker.task (~8 MB)
+#    https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
+
+---
+
+## Training Pipeline
+
+### Step 1 — Collect Data
+
+```bash
+python -m training.collect_data
+```
+
+- Enter a gesture label when prompted (e.g. `A`, `B`, `C`, `PEACE`, `OK`)
+- Hold your hand in front of the webcam
+- Press **`s`** to save a sample, **`q`** to finish that label
+- Aim for **~100 samples per gesture** (500 total)
+- Samples are appended to `dataset/gestures.csv`
+
+Tips for quality data:
+- Vary hand angle and distance slightly between samples
+- Use consistent, diffuse lighting — avoid strong backlight
+- Keep a plain background if possible
+- Balance samples evenly across all labels
+
+### Step 2 — Train Model
+
+```bash
+python -m training.train_model
+```
+
+- Loads `dataset/gestures.csv`
+- Applies Gaussian jitter augmentation (`JITTER_SIGMA`, `JITTER_COPIES` in config)
+- Runs 5-fold GridSearchCV over SVC `C` and `gamma`
+- Prints classification report + confusion matrix
+- Saves trained model and label map to `models/model.pkl`
+
+Expected accuracy with ~100 samples/gesture: **>95% on held-out test split**.
+
+---
+
+## Running Recognition
+
+### Standard (PC, windowed)
+
+```bash
+python -m inference.run_recognition
+```
+
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `r` | Reset EWMA buffer |
+
+Overlay shows predicted label + confidence. Green = high confidence (≥ 0.60), yellow = lower.
+
+### Headless (no display)
+
+```bash
+python -m inference.run_recognition --headless
+```
+
+Prints predictions to the terminal — useful for SSH sessions or pipelines.
 
 ### Platform Modes
 
-| Command | Platform | Window | Resolution | FPS cap |
-|---------|----------|--------|------------|---------|
-| `python run_recognition.py` | PC | yes | 640×480 | none |
-| `python run_recognition.py --headless` | PC | no | 640×480 | none |
-| `python run_recognition.py --platform rpi` | RPi | no | 320×240 | 10 |
-| `python run_recognition.py --platform arduino` | Arduino | no | 320×240 | 10 |
-
-Auto-detection reads `/proc/device-tree/model`; falls back to `pc`.
-
-### GPIO Pin Map
-
-Each gesture drives a distinct BCM pin HIGH when detected:
-
-| Gesture | BCM Pin |
-|---------|---------|
-| A | 17 |
-| B | 27 |
-| C | 22 |
-| PEACE | 23 |
-| OK | 24 |
-
-On PC/simulation the pin state is printed to the terminal:
-```
-[09:14:32] [GPIO] Pin 17 HIGH  |  Gesture: A  |  Confidence: 0.94
+```bash
+python -m inference.run_recognition                    # PC, windowed, 640×480
+python -m inference.run_recognition --headless         # PC, no window
+python -m inference.run_recognition --platform rpi     # RPi, headless, 320×240, 10 FPS
+python -m inference.run_recognition --platform arduino # Arduino serial, 320×240, 10 FPS
 ```
 
-### Arduino Serial Protocol
-
-When `--platform arduino` is used, each gesture detection writes a line to `/dev/ttyUSB0`:
-```
-GESTURE:A:94\n   ← label : confidence_as_integer_percent
-```
-If the serial port is unavailable it falls back to console simulation automatically.
-
-### Arduino Wiring Diagram
-
-```
-Raspberry Pi 4          Arduino / LED array
-─────────────           ────────────────────
-BCM 17 (Pin 11) ──────► LED_A  (anode → 220Ω → GND)
-BCM 27 (Pin 13) ──────► LED_B
-BCM 22 (Pin 15) ──────► LED_C
-BCM 23 (Pin 16) ──────► LED_PEACE
-BCM 24 (Pin 18) ──────► LED_OK
-GND    (Pin 6)  ──────► GND (common)
-```
-
-Or use TX (Pin 8) → Arduino RX with `--platform arduino` for serial control.
-
-### Raspberry Pi Setup
-
-1. Flash **Raspberry Pi OS Lite** (64-bit) — no desktop required
-2. Enable camera: `sudo raspi-config` → Interface Options → Camera
-3. Install dependencies:
-   ```bash
-   pip install -r requirements_pi.txt
-   ```
-4. Copy project files to the Pi (scp or git clone)
-5. Run headless:
-   ```bash
-   python run_recognition.py --platform rpi
-   ```
-   Press **Ctrl+C** to quit.
-
-> `RPi.GPIO` installs automatically only on aarch64 (Pi hardware).
-> On PC it is skipped and GPIO output is simulated in the terminal.
+Platform auto-detection reads `/proc/device-tree/model` and falls back to `pc`.
 
 ---
 
-## Verification
+## Web Dashboard
 
 ```bash
-# Check imports
-python -c "import cv2, mediapipe, sklearn, numpy, joblib; print('OK')"
-
-# Check dataset shape (should be (N, 64) where N = total samples)
-python -c "import numpy as np; d=np.genfromtxt('dataset/gestures.csv',delimiter=',',dtype=str,skip_header=1); print(d.shape)"
+python -m web.app
 ```
+
+Open **http://localhost:5000** in a browser.
+
+| Feature | Description |
+|---------|-------------|
+| Live MJPEG feed | Webcam stream with hand-landmark overlay (`/video_feed`) |
+| Confidence gauge | Circular meter showing current prediction confidence |
+| Gesture history log | Last 50 gesture events with timestamps |
+| Real-time chart | Chart.js bar chart updating via WebSocket |
+
+WebSocket event format (`/ws`):
+```json
+{
+  "label": "A",
+  "confidence": 0.93,
+  "command": "YES",
+  "timestamp": 1710000000.0
+}
+```
+
+Key config settings:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `WEB_HOST` | `0.0.0.0` | Bind address |
+| `WEB_PORT` | `5000` | Port |
+| `MJPEG_QUALITY` | `70` | JPEG compression quality |
+| `WS_EVENT_RATE` | `0.1 s` | WebSocket push interval |
+| `HISTORY_MAX` | `50` | Events kept in history |
 
 ---
 
-## Edge AI Inference (Embedded Linux)
+## Edge Inference (Raspberry Pi)
 
-`edge_inference.py` is a purpose-built inference script for **Raspberry Pi / embedded Linux**.
-It replaces `run_recognition.py` on the Pi with features designed for constrained hardware:
-real performance metrics, frame skipping to reduce CPU load, a gesture-to-command translation
-layer, and direct GPIO control via a standalone `GpioController`.
+`edge_inference.py` is optimised for constrained hardware with frame skipping, an FPS cap, real-time performance metrics, and a gesture-to-command translation layer.
 
-### What's different from `run_recognition.py`
+### Quick-Start on Pi
 
-| Feature | `run_recognition.py` | `edge_inference.py` |
-|---------|----------------------|---------------------|
-| Target | PC / demo | Embedded Linux / Pi |
-| Frame skip | No | Yes (default: every 2nd frame) |
-| FPS cap | Embedded platforms only | Always (default: 15 FPS) |
-| Metrics (FPS / inference ms) | No | Yes |
-| Gesture→Command mapping | No | Yes |
-| GPIO module | `platform_io.py` | `gpio_controller.py` (standalone) |
-| Camera open | `CAP_DSHOW` (Windows) | No flag (Linux `/dev/video0`) |
+```bash
+# 1. Copy project or git clone to the Pi
+# 2. Run the installer
+bash install_pi.sh
+
+# 3. Headless inference (recommended for production)
+python3 -m inference.edge_inference --headless
+
+# 4. Windowed (if monitor attached)
+python3 -m inference.edge_inference
+```
+
+`install_pi.sh` installs all Pi dependencies and checks for `RPi.GPIO`.
 
 ### CLI Flags
 
 ```bash
-python edge_inference.py                     # windowed + GPIO simulation
-python edge_inference.py --headless          # terminal only, no window
-python edge_inference.py --skip-frames 2    # process every 2nd frame (default)
-python edge_inference.py --skip-frames 1    # process every frame (higher CPU)
-python edge_inference.py --fps-cap 15       # target FPS (default: 15)
-python edge_inference.py --fps-cap 5        # visibly slow — ~5 FPS
-python edge_inference.py --no-gpio          # disable GPIO entirely
+python3 -m inference.edge_inference                   # windowed, GPIO enabled
+python3 -m inference.edge_inference --headless        # no window
+python3 -m inference.edge_inference --skip-frames 2  # process every 2nd frame (default)
+python3 -m inference.edge_inference --skip-frames 1  # process every frame (higher CPU)
+python3 -m inference.edge_inference --fps-cap 15     # target FPS (default)
+python3 -m inference.edge_inference --fps-cap 5      # ~5 FPS (very light CPU load)
+python3 -m inference.edge_inference --no-gpio         # disable GPIO entirely
 ```
 
 ### Performance Metrics
 
-Every frame tracks and displays:
-
 | Metric | Description |
 |--------|-------------|
-| `FPS` | Rolling 30-frame average frames per second |
-| `Inference ms` | Time spent in MediaPipe + SVC predict |
+| `FPS` | Rolling 30-frame average |
+| `Inference ms` | MediaPipe + SVC predict time |
 | `Frame ms` | Total loop iteration time |
 
-### Gesture-to-Command Map
+### Gesture → Command Map
 
 | Gesture | Command |
 |---------|---------|
-| A | YES |
-| B | NO |
-| C | CONFIRM |
-| PEACE | HELLO |
-| OK | OK |
+| `A` | YES |
+| `B` | NO |
+| `C` | CONFIRM |
+| `PEACE` | HELLO |
+| `OK` | OK |
 
-### Terminal Output (headless)
+### Feature Comparison
 
-```
-[EDGE] Gesture: A  →  Command: YES
-[EDGE] Confidence: 0.91 | FPS: 13 | Inference: 28 ms | Frame: 35 ms
-```
+| Feature | `run_recognition` | `edge_inference` |
+|---------|------------------|-----------------|
+| Target | PC / demo | Embedded Linux / Pi |
+| Frame skip | No | Yes (default: every 2nd) |
+| FPS cap | Embedded platforms only | Always |
+| Performance metrics | No | Yes |
+| Gesture→Command | No | Yes |
+| GPIO module | `platform_io` | `gpio_controller` (standalone) |
+| Camera backend | `CAP_DSHOW` (Windows) | No flag (Linux `/dev/video0`) |
 
-### Display Overlay (windowed)
+---
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  [camera feed + hand landmarks]                             │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│ Gesture: A  →  YES              Confidence: 0.91            │
-│ FPS: 13  Inference: 28ms  Frame: 35ms  [q=quit r=reset]     │
-└─────────────────────────────────────────────────────────────┘
-```
+## Hardware / GPIO
 
-### Raspberry Pi Quick-Start
+### GPIO Pin Map (BCM numbering)
 
-```bash
-# 1. Copy project to Pi (or git clone)
-# 2. Run the installer
-bash install_pi.sh
+| Gesture | BCM Pin | Physical Pin |
+|---------|---------|-------------|
+| A | 17 | 11 |
+| B | 27 | 13 |
+| C | 22 | 15 |
+| PEACE | 23 | 16 |
+| OK | 24 | 18 |
 
-# 3. Run headless inference
-python3 edge_inference.py --headless
-
-# 4. Run with display (if monitor attached)
-python3 edge_inference.py
-```
-
-`install_pi.sh` installs `opencv-python-headless`, `mediapipe`, `numpy`,
-`scikit-learn`, `joblib`, and `pyserial` via pip, and checks for `RPi.GPIO`.
-
-### GPIO Wiring (same as Embedded Systems Demo above)
-
-| Gesture | BCM Pin |
-|---------|---------|
-| A | 17 |
-| B | 27 |
-| C | 22 |
-| PEACE | 23 |
-| OK | 24 |
-
-On PC, GPIO is automatically simulated — no hardware required:
+On PC, GPIO is **simulated** in the terminal — no hardware required:
 ```
 [GPIO] Pins [17, 27, 22, 23, 24] configured as OUTPUT (simulated)
 [GPIO] Pin 17 HIGH → A (sim)
 ```
 
-On real Pi hardware, `RPi.GPIO` is imported automatically and actual pins switch state.
+### Wiring Diagram
+
+```
+Raspberry Pi 4          LED Array / Peripheral
+──────────────          ──────────────────────
+BCM 17 (Pin 11) ──────► Gesture-A  signal
+BCM 27 (Pin 13) ──────► Gesture-B  signal
+BCM 22 (Pin 15) ──────► Gesture-C  signal
+BCM 23 (Pin 16) ──────► Gesture-PEACE signal
+BCM 24 (Pin 18) ──────► Gesture-OK signal
+GND    (Pin 6)  ──────► GND (common)
+```
+
+Each signal line → 220 Ω resistor → LED anode → LED cathode → GND.
+
+### Arduino Serial Protocol
+
+```bash
+python -m inference.run_recognition --platform arduino
+```
+
+Writes one line per detection to `/dev/ttyUSB0` (or `COM*` on Windows):
+```
+GESTURE:A:94
+```
+Format: `GESTURE:<LABEL>:<CONFIDENCE_PERCENT>\n`
+
+Falls back to terminal simulation if the port is unavailable.
+
+---
+
+## Configuration
+
+All tuneable values live in `config.py`. No hardcoded constants anywhere else.
+
+| Section | Key | Default | Description |
+|---------|-----|---------|-------------|
+| Paths | `MODEL_PATH` | `models/model.pkl` | Trained SVC location |
+| Paths | `DATASET_PATH` | `dataset/gestures.csv` | Training data |
+| Paths | `MP_MODEL_PATH` | `hand_landmarker.task` | MediaPipe model |
+| Features | `FEATURE_DIM` | `66` | 21 landmarks × 3 + 3 palm-normal |
+| MediaPipe | `MP_DETECTION_CONFIDENCE` | `0.7` | Hand detection threshold |
+| MediaPipe | `MP_TRACKING_CONFIDENCE` | `0.6` | Landmark tracking threshold |
+| Inference | `CONFIDENCE_THRESHOLD` | `0.60` | Minimum confidence to emit gesture |
+| Inference | `EWMA_ALPHA` | `0.3` | Smoothing factor (higher = less smoothing) |
+| Training | `TEST_SIZE` | `0.2` | Train/test split ratio |
+| Training | `JITTER_SIGMA` | `0.01` | Gaussian jitter std dev |
+| Training | `JITTER_COPIES` | `2` | Augmentation copies per sample |
+| Training | `SVC_PARAM_GRID` | see file | GridSearchCV search space |
+| Camera | `CAM_INDEX_PC` | `0` | Webcam device index |
+| Camera | `RES_PC` | `(640, 480)` | PC resolution |
+| Camera | `RES_EMBEDDED` | `(320, 240)` | Embedded resolution |
+| Web | `WEB_PORT` | `5000` | Dashboard port |
+| Edge | `EDGE_FPS_CAP` | `15` | Max FPS on embedded target |
+| Edge | `EDGE_SKIP_FRAMES` | `2` | Process every Nth frame |
+
+---
+
+## Tests
+
+```bash
+pytest tests/ -v
+```
+
+The suite covers:
+- `test_gestures.py` — gesture label list integrity
+- `test_predictor.py` — `EWMAPredictor` smoothing, reset, and threshold behaviour
+- `test_utils.py` — feature extraction dimensionality and normalisation
+
+---
+
+## Platform Notes
+
+### Windows
+- Uses `cv2.CAP_DSHOW` backend for faster webcam startup
+- If webcam fails to open, try `CAM_INDEX_PC = 1` or `2` in `config.py`
+- MediaPipe may print harmless warnings on first run
+
+### Raspberry Pi
+- Use **Raspberry Pi OS Lite 64-bit** (no desktop needed for headless mode)
+- Enable camera: `sudo raspi-config` → Interface Options → Camera
+- `RPi.GPIO` installs automatically on aarch64 hardware; skipped on x86
+- Run `install_pi.sh` for one-shot dependency installation
+
+### Linux / macOS
+- Change `CAM_BACKEND` to `""` (empty string) in `config.py`
+- Camera index `0` usually maps to the built-in webcam
