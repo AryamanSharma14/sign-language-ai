@@ -51,6 +51,13 @@ def main():
     skip_frames = args.skip_frames
     fps_cap = args.fps_cap
 
+    # Auto-download missing assets
+    from setup_helper import ensure_assets
+    import sys
+    if not ensure_assets():
+        print("[Error] Required assets missing. Run 'python setup.py' first.")
+        return
+
     gpio = GpioController(simulate=args.no_gpio)
     gpio.setup()
 

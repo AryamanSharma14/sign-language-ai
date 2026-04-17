@@ -13,11 +13,18 @@ Run:
 
 import json
 import time
+import sys
 from flask import Flask, Response, render_template
 from flask_sock import Sock
 
 import config
+from setup_helper import ensure_assets
 from web import stream as cam
+
+# Ensure assets exist before starting
+if not ensure_assets():
+    print("[Error] Required assets missing. Run 'python setup.py' first.")
+    sys.exit(1)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 sock = Sock(app)

@@ -69,6 +69,12 @@ def main():
     platform = args.platform or detect_platform()
     headless = args.headless or platform in ("rpi", "arduino")
 
+    # Auto-download missing assets
+    from setup_helper import ensure_assets
+    if not ensure_assets():
+        print("[Error] Required assets missing. Run 'python setup.py' first.")
+        return
+
     hw = HardwareIO(platform)
     hw.boot()
 

@@ -171,13 +171,24 @@ python -m venv venv
 venv\Scripts\activate          # Windows
 # source venv/bin/activate     # Linux / macOS
 
-# 3. Install dependencies
+# 3. Run setup (auto-downloads MediaPipe model)
+python setup.py
+
+# 4. Install dependencies
 pip install -r requirements.txt
 
-# 4. Download the MediaPipe hand model and place it in the project root:
-#    hand_landmarker.task (~8 MB)
-#    https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+# 5. Collect training data and train model (one-time)
+python -m training.collect_data      # Collect ~100 samples per gesture
+python -m training.train_model       # Train SVC classifier
+
+# 6. Run inference or dashboard
+python -m inference.run_recognition  # Real-time recognition
+python -m web.app                    # Web dashboard (http://localhost:5000)
 ```
+
+**Note:** `setup.py` auto-downloads the MediaPipe hand landmarker model. If you're offline, manually download it from:
+https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+and place in the project root.
 
 ---
 
@@ -297,18 +308,29 @@ Key config settings:
 ### Quick-Start on Pi
 
 ```bash
-# 1. Copy project or git clone to the Pi
-# 2. Run the installer
+# 1. Clone and enter project
+git clone https://github.com/AryamanSharma14/sign-language-ai.git
+cd sign-language-ai
+
+# 2. Run setup (auto-downloads MediaPipe model)
+python3 setup.py
+
+# 3. Run the Pi installer (installs RPi.GPIO + system dependencies)
 bash install_pi.sh
 
-# 3. Headless inference (recommended for production)
+# 4. Headless inference (recommended for production)
 python3 -m inference.edge_inference --headless
 
-# 4. Windowed (if monitor attached)
+# 5. Or windowed (if monitor attached)
 python3 -m inference.edge_inference
 ```
 
-`install_pi.sh` installs all Pi dependencies and checks for `RPi.GPIO`.
+**Note:** On first clone, you'll need to train the model on a PC first:
+```bash
+python -m training.collect_data      # Collect gesture samples
+python -m training.train_model       # Train the classifier
+```
+Then copy the trained `models/model.pkl` to the Pi, or train directly on Pi if it has a camera.
 
 ### CLI Flags
 
