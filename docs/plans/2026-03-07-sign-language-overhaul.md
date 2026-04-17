@@ -1,7 +1,5 @@
 # Sign Language AI — Full Overhaul Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Restructure the codebase, add 6 new gestures, improve accuracy with palm-orientation features + augmentation + GridSearchCV + EWMA smoothing, and add a Flask web dashboard with live MJPEG feed and real-time stats.
 
 **Architecture:** A `core/` package owns all ML logic (single source of truth for labels, feature extraction, inference). A `web/` package runs Flask with a background camera thread pushing MJPEG frames and WebSocket JSON events independently. All tunables live in `config.py`.
