@@ -14,13 +14,13 @@ FEATURE_DIM   = 66   # 21 landmarks × 3 coords + 3 palm-normal coords
 
 # ── MediaPipe ─────────────────────────────────────────────────────────────────
 MP_NUM_HANDS              = 1
-MP_DETECTION_CONFIDENCE   = 0.7
+MP_DETECTION_CONFIDENCE   = 0.5
 MP_PRESENCE_CONFIDENCE    = 0.5
-MP_TRACKING_CONFIDENCE    = 0.6
+MP_TRACKING_CONFIDENCE    = 0.5
 
 # ── Inference / smoothing ─────────────────────────────────────────────────────
-CONFIDENCE_THRESHOLD = 0.60
-EWMA_ALPHA           = 0.3
+CONFIDENCE_THRESHOLD = 0.50
+EWMA_ALPHA           = 0.5
 
 # ── Training ──────────────────────────────────────────────────────────────────
 TEST_SIZE        = 0.2
